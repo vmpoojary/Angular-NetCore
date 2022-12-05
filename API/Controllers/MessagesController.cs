@@ -11,13 +11,11 @@ namespace API.Controllers
 {
     public class MessagesController:BaseApiController
     {
-        public IUserRepository _userRepository { get; }
-        public IMessageRepository _messageRepository { get; }
         public IMapper _mapper { get; }
-        public MessagesController(IUserRepository userRepository,IMessageRepository messageRepository,IMapper mapper){
-            _mapper = mapper;
-            _messageRepository = messageRepository;
-            _userRepository = userRepository;
+        private readonly IUnitOfWork _unitOfWork;
+        public MessagesController(IMapper mapper, IUnitOfWork unitOfWork){
+            _unitOfWork = unitOfWork;
+            _mapper=mapper;
 
         }
 
@@ -29,8 +27,8 @@ namespace API.Controllers
                 return BadRequest("You cannot send messages to yourself");
             }
 
-            var sender=await _userRepository.GetUserByUsernameAsync(username);
-            var recipient=await _userRepository.GetUserByUsernameAsync(createMessageDTO.RecipientUsername);
+            var sender=await _unitOfWork.UserRepository.GetUserByUsernameAsync(username);
+            var recipient=await _unitOfWork.UserRepository.GetUserByUsernameAsync(createMessageDTO.RecipientUsername);
 
             if(recipient==null)
             {
@@ -44,9 +42,9 @@ namespace API.Controllers
                 RecipientUsername=recipient.UserName,
                 Content=createMessageDTO.Content
             };
-            _messageRepository.AddMessage(message);
+            _unitOfWork.MessageRepository.AddMessage(message);
 
-            if (await _messageRepository.SaveAllAsync())
+            if (await _unitOfWork.Complete())
                 return Ok(_mapper.Map<MessageDto>(message));
        
 
@@ -58,7 +56,7 @@ namespace API.Controllers
         public async Task<ActionResult<PagedList<MessageDto>>> GetMessagesForUser([FromQuery]MessageParams messageParams)
         {
             messageParams.Username=User.GetUserName();
-            var messages=await _messageRepository.GetMessageForUser(messageParams);
+            var messages=await _unitOfWork.MessageRepository.GetMessageForUser(messageParams);
             Response.AddPaginationHeader(new PaginationHeader(messages.CurrentPage,
                                                             messages.PageSize,messages.TotalCount,messages.TotalPages
                                                             ));
@@ -66,18 +64,18 @@ namespace API.Controllers
             return messages;
         }
 
-        [HttpGet("thread/{username}")]
-        public async Task<ActionResult<IEnumerable<MemberDTO>>> GetMessageThread(string username)
-        {
-            var currentUserName=User.GetUserName();
-            return Ok(await _messageRepository.GetMessageThread(currentUserName,username));
-        }
+        // [HttpGet("thread/{username}")]
+        // public async Task<ActionResult<IEnumerable<MemberDTO>>> GetMessageThread(string username)
+        // {
+        //     var currentUserName=User.GetUserName();
+        //     return Ok(await _unitOfWork.MessageRepository.GetMessageThread(currentUserName,username));
+        // }
 
         [HttpDelete("{id}")]
         public async Task<ActionResult> DeleteMessage(int id)
         {
             var username=User.GetUserName();
-            var message=await _messageRepository.GetMessage(id);
+            var message=await _unitOfWork.MessageRepository.GetMessage(id);
 
             if(message.SenderUsername != username && message.RecipientUsername!=username)
                 return Unauthorized();
@@ -86,10 +84,10 @@ namespace API.Controllers
             if(message.RecipientUsername==username) message.RecipientDeleted=true;
 
             if(message.SenderDeleted && message.RecipientDeleted){
-                _messageRepository.DeleteMessage(message);
+                _unitOfWork.MessageRepository.DeleteMessage(message);
             }
 
-            if(await _messageRepository.SaveAllAsync()) return Ok();
+            if(await _unitOfWork.Complete()) return Ok();
 
             return BadRequest("Problem deleting the message");
         }

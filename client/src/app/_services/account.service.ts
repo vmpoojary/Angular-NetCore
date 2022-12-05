@@ -4,6 +4,7 @@ import { Injectable } from '@angular/core';
 import { map, ReplaySubject } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import { User } from '../_models/user';
+import { PresenceService } from './presence.service';
 
 @Injectable({
   providedIn: 'root'
@@ -13,7 +14,9 @@ export class AccountService {
   baseUrl=environment.apiUrl;
   private currentUserSource=new ReplaySubject<User>(1);
   currentUser$=this.currentUserSource.asObservable();
-  constructor(private http:HttpClient) { }
+  constructor(private http:HttpClient,
+              private presenceService:PresenceService
+            ) { }
 
   login(model:any)
   {
@@ -31,12 +34,19 @@ export class AccountService {
   {
     localStorage.removeItem('user');
     this.currentUserSource.next(null);
+    this.presenceService.stopHubConnection();
   }
 
   setCurrentUser(user:User)
   {
+    user.role=[];
+    const roles=this.getDecodedToken(user.token).role;
+    Array.isArray(roles)?user.role=roles:user.role.push(roles);
+
     localStorage.setItem('user',JSON.stringify(user));
     this.currentUserSource.next(user);
+
+    this.presenceService.createHubConnection(user); 
   }
 
 
@@ -51,5 +61,10 @@ export class AccountService {
         }
       })
     )
+  }
+
+  getDecodedToken(token:string)
+  {
+    return JSON.parse(atob(token.split('.')[1]))
   }
 }

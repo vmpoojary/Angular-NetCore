@@ -3,7 +3,7 @@
         <img src="{{member.photoUrl || './assets/user.png'}}" alt="{{member.knownAs}}" class="card-img-top">
          <ul class="list-inline member-icon animate text-center">
             <li class="list-inline-item">
-                <button class="btn btn-primary" routerLink='/members/{{member.knownAs}}'>
+                <button class="btn btn-primary" routerLink='/members/{{member.userName}}'>
                     <i class="fa fa-user"></i>
                 </button>
             </li>
@@ -14,7 +14,7 @@
             </li>
             <li class="list-inline-item">
                 <button class="btn btn-primary"
-                routerLink="/members/{{member.userName}"
+                routerLink="/members/{{member.userName}}"
                 [queryParams]="{tab:'Messages'}">
                     <i class="fa fa-envelope"></i>
                 </button>
@@ -23,9 +23,12 @@
     </div>
     <div class="card-body p-1">
         <h6 class="card-title text-center mb-1">
-            <i class="fa fa-user mr-2">
+            <span [class.is-online]="(presenceService.onlineUsers$ | async)?.includes(member.userName)">
+                <i class="fa fa-user mr-2"></i>
+            </span>
+            
                 {{member.knownAs}}, {{member.age}}
-            </i>
+            
         </h6>
         <p class="card-text text-muted text-center">
             {{member.city}}
